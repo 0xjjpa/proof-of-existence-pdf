@@ -1,0 +1,2 @@
+export const privateKeyWIF = 'cPYJkEjMNriXGGiQtMeR1E1L7FUi8G6UcB39EciyotbhSJYqsb3V'
+export const publicAddress = 'n1fUT9Z5r5JgGkrHLyeVgFkMkBS7V26cFj'

@@ -1,6 +1,9 @@
-import React from 'react';
+import React from 'react'
 import { default as InputFile } from './components/inputfile'
 import { default as FileList } from './components/filelist'
+import { Button } from './components/button'
+import { privateKeyWIF } from './constants/index'
+import blockchainAnchor from 'blockchain-anchor'
 
 class App extends React.Component {
   constructor(props) {
@@ -9,16 +12,17 @@ class App extends React.Component {
       fileReader: new FileReader(),
       files: [],
       pages: [],
-      currentFile: null
+      currentFile: null,
+      currentFileAsArrayBuffer: null
     }
     this.state.fileReader.onload = this.loadFileReader.bind(this)
   }
   
   loadFileReader = e => {
+    this.setState({ currentFileAsArrayBuffer: e.target.result })
     window.PDFJS.getDocument(new Uint8Array(e.target.result)).then(pdf => {
       // Hardcoded to match the current viewport
       let scale = 0.72;
-      
       let viewport, canvas, context, renderContext;
       
       // This is a good example of why handling DOM directly w/React is a bad idea
@@ -70,10 +74,50 @@ class App extends React.Component {
     this.loadFile(file)
   }
   
+  bufToHex = buf => {
+    let byteArray = new Uint8Array(buf),
+        hexString = '',
+        nextHexByte;
+
+    for (let i=0; i<byteArray.byteLength; i++) {
+        nextHexByte = byteArray[i].toString(16);
+        if (nextHexByte.length < 2) {
+            nextHexByte = '0' + nextHexByte;
+        }
+        hexString += nextHexByte;
+    }
+    return hexString;
+  }
+  
+  createHash = () => {
+
+   const anchorOptions = {
+     btcUseTestnet: true,
+     blockchainServiceName: 'blockcypher', // optional, defaults to 'Any'
+     blockcypherToken: 'd741e7df12754f63986f617d0ee4eb51', // required if using 'blockcypher' service
+   };
+   window.crypto.subtle.digest('SHA-256', this.state.currentFileAsArrayBuffer)
+     .then(async (digest) => {
+        const hexData = this.bufToHex(digest)
+        const feeTotalSatoshi = 150000
+        const anchor = new blockchainAnchor(anchorOptions);
+        console.log('privateKeyWIF', privateKeyWIF)
+        let txResult
+        try {
+          txResult = await anchor.btcOpReturnAsync(privateKeyWIF, hexData, feeTotalSatoshi)
+          console.log(`New transaction id = ${txResult.txId}`)
+          console.log(`Raw transaction = ${txResult.rawTx}`)
+        } catch (error) {
+          console.error(error.message)
+        }
+     }
+   )
+  }
+  
   render() {
     let { files } = this.state;
     console.log("Files", files)
-        console.log("Pages", this.state.pages)
+    console.log("Pages", this.state.pages)
     return (
       <div className="center">
         <div className="Sidebar">
@@ -81,6 +125,14 @@ class App extends React.Component {
           Select a PDF file
         </InputFile>
         <FileList files={files} loadFile={this.loadFile.bind(this)} />
+        {
+            this.state.currentFile && 
+            <div style={{ margin: '1em' }}>
+            <Button onClick={this.createHash.bind(this)} type="primary">
+              Create hash
+            </Button>
+            </div>
+        }
         </div>
         <div className="Content">
           <h2 style={{ marginTop: 0, color: "#efefef" }}>Your PDF file will be viewed here.</h2>
